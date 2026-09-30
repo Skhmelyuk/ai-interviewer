@@ -1,25 +1,26 @@
-import React, { useState, useCallback } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
+  INTERVIEW_LEVELS,
+  INTERVIEW_TOPICS,
+  InterviewTopic,
+} from "@/constants/topics";
+import { getApiKey, getCustomApiKey, getEnvApiKey } from "@/services/storage";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, useFocusEffect } from "expo-router";
-import { getCustomApiKey, getEnvApiKey } from "@/services/storage";
-import { sendChatToOpenRouter } from "@/services/openrouter";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [hasKey, setHasKey] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<InterviewTopic>(
+    INTERVIEW_TOPICS[0],
+  );
+  const [selectedLevel, setSelectedLevel] = useState<
+    (typeof INTERVIEW_LEVELS)[number]
+  >(INTERVIEW_LEVELS[1]);
+  const [hasApiKey, setHasApiKey] = useState(false);
   const [keySource, setKeySource] = useState<"secure_store" | "env" | null>(
     null,
   );
-  const [testResponse, setTestResponse] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -30,29 +31,30 @@ export default function HomeScreen() {
   const checkKey = async () => {
     const customKey = await getCustomApiKey();
     if (customKey) {
-      setHasKey(true);
+      setHasApiKey(true);
       setKeySource("secure_store");
       return;
     }
     const envKey = getEnvApiKey();
     if (envKey) {
-      setHasKey(true);
+      setHasApiKey(true);
       setKeySource("env");
       return;
     }
-    setHasKey(false);
+    setHasApiKey(false);
     setKeySource(null);
   };
 
-  const testAI = async () => {
-    if (!hasKey) {
+  const handleStart = async () => {
+    const key = await getApiKey();
+    if (!key) {
       Alert.alert(
-        "Ключ не знайдено",
-        "Перед тестуванням збережіть API-ключ OpenRouter у вкладці Налаштування або додайте його у файл .env.",
+        "API-ключ відсутній",
+        "Для проходження співбесіди налаштуйте безкоштовний ключ OpenRouter у вкладці Налаштування або вкажіть його у файлі .env.",
         [
           { text: "Скасувати", style: "cancel" },
           {
-            text: "Налаштування",
+            text: "Налаштувати",
             onPress: () => router.push("/(tabs)/settings"),
           },
         ],
@@ -60,54 +62,56 @@ export default function HomeScreen() {
       return;
     }
 
-    setLoading(true);
-    setTestResponse(null);
-    try {
-      const reply = await sendChatToOpenRouter({
-        messages: [
-          {
-            role: "system",
-            content:
-              "Ти досвідчений Mobile Tech Lead. Дай коротку надихаючу пораду (1 речення) кандидату на посаду Junior React Native розробника українською мовою.",
-          },
-          { role: "user", content: "Привіт! Я готовий до співбесіди." },
-        ],
-      });
-      setTestResponse(reply);
-    } catch (err: any) {
-      Alert.alert("Помилка AI", err.message);
-    } finally {
-      setLoading(false);
-    }
+    // Перехід на екран співбесіди з передачею параметрів
+    router.push({
+      pathname: "/interview",
+      params: {
+        topicId: selectedTopic.id,
+        levelId: selectedLevel.id,
+      },
+    });
   };
 
   return (
     <SafeAreaView className="flex-1 bg-background-dark">
+      {/* Верхня панель */}
+      <View className="flex-row items-center justify-between border-b border-slate-800 px-6 py-3.5 bg-slate-900/60">
+        <Text className="text-xl font-extrabold text-white">
+          AI Interviewer
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.push("/(tabs)/settings")}
+          className="rounded-full bg-slate-800 p-2.5 border border-slate-700 active:bg-slate-700"
+        >
+          <Text className="text-sm">⚙️</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
-        contentContainerClassName="flex-grow p-6 justify-center items-center"
+        contentContainerClassName="p-6 pb-12"
         showsVerticalScrollIndicator={false}
       >
         {/* Статус ключа */}
         <TouchableOpacity
           onPress={() => router.push("/(tabs)/settings")}
           activeOpacity={0.8}
-          className={`flex-row items-center gap-2 rounded-full px-4 py-1.5 mb-6 border ${
-            hasKey
+          className={`flex-row items-center gap-2 rounded-full px-4 py-1.5 mb-6 self-start border ${
+            hasApiKey
               ? "bg-accent-success/20 border-accent-success/40"
               : "bg-accent-warning/20 border-accent-warning/40"
           }`}
         >
           <View
             className={`w-2 h-2 rounded-full ${
-              hasKey ? "bg-accent-success" : "bg-accent-warning"
+              hasApiKey ? "bg-accent-success" : "bg-accent-warning"
             }`}
           />
           <Text
             className={`text-xs font-semibold ${
-              hasKey ? "text-accent-success" : "text-accent-warning"
+              hasApiKey ? "text-accent-success" : "text-accent-warning"
             }`}
           >
-            {hasKey
+            {hasApiKey
               ? keySource === "env"
                 ? "API-ключ підключено (.env)"
                 : "API-ключ підключено (SecureStore)"
@@ -115,51 +119,87 @@ export default function HomeScreen() {
           </Text>
         </TouchableOpacity>
 
-        <Text className="text-3xl font-extrabold text-white text-center mb-2">
-          AI Mock Interviewer
+        <Text className="text-2xl font-bold text-white mb-1">
+          Оберіть напрям співбесіди
         </Text>
-        <Text className="text-sm text-slate-400 text-center mb-8 max-w-xs">
-          Тестування з'єднання з OpenRouter AI та сховища ключів SecureStore
+        <Text className="text-sm text-slate-400 mb-6">
+          AI проведе реалістичний скринінг твоїх знань та надасть розгорнутий
+          фідбек.
         </Text>
 
-        {/* Кнопка тестового запиту */}
-        <TouchableOpacity
-          onPress={testAI}
-          disabled={loading}
-          activeOpacity={0.8}
-          className="w-full max-w-sm rounded-2xl bg-primary py-4 items-center shadow-lg active:bg-primary-dark mb-4"
-        >
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text className="font-bold text-white text-base">
-              &#x1f680; Перевірити зв'язок з AI
-            </Text>
-          )}
-        </TouchableOpacity>
+        {/* Список тем */}
+        <View className="gap-3 mb-6">
+          {INTERVIEW_TOPICS.map((topic) => {
+            const isSelected = selectedTopic.id === topic.id;
+            return (
+              <TouchableOpacity
+                key={topic.id}
+                onPress={() => setSelectedTopic(topic)}
+                activeOpacity={0.8}
+                className={`rounded-2xl p-4 border transition-all ${
+                  isSelected
+                    ? "bg-primary/20 border-primary"
+                    : "bg-background-card border-slate-800"
+                }`}
+              >
+                <View className="flex-row items-center gap-3.5">
+                  <Text className="text-3xl">{topic.icon}</Text>
+                  <View className="flex-1">
+                    <Text className="font-bold text-white text-base">
+                      {topic.title}
+                    </Text>
+                    <Text className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      {topic.description}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-        {/* Перехід до налаштувань */}
+        {/* Вибір рівня */}
+        <Text className="text-lg font-bold text-white mb-3">
+          Рівень складності
+        </Text>
+        <View className="flex-row gap-2 mb-8">
+          {INTERVIEW_LEVELS.map((lvl) => {
+            const isSelected = selectedLevel.id === lvl.id;
+            return (
+              <TouchableOpacity
+                key={lvl.id}
+                onPress={() => setSelectedLevel(lvl)}
+                className={`flex-1 rounded-xl py-3 px-2 border items-center ${
+                  isSelected
+                    ? "bg-accent-purple/20 border-accent-purple"
+                    : "bg-background-card border-slate-800"
+                }`}
+              >
+                <Text
+                  className={`text-xs font-bold text-center ${
+                    isSelected ? "text-accent-purple" : "text-slate-400"
+                  }`}
+                >
+                  {lvl.title}
+                </Text>
+                <Text className="text-[10px] text-slate-500 mt-1">
+                  {lvl.questionsCount} питань
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Кнопка старту */}
         <TouchableOpacity
-          onPress={() => router.push("/(tabs)/settings")}
+          onPress={handleStart}
           activeOpacity={0.8}
-          className="w-full max-w-sm rounded-2xl bg-slate-800 py-3.5 items-center border border-slate-700 active:bg-slate-700 mb-6"
+          className="rounded-2xl bg-primary py-4 items-center shadow-lg active:bg-primary-dark"
         >
-          <Text className="text-slate-300 font-semibold text-sm">
-            ⚙️ Відкрити налаштування (Settings Tab)
+          <Text className="font-bold text-white text-base">
+            &#x1f680; Розпочати співбесіду
           </Text>
         </TouchableOpacity>
-
-        {/* Результат від AI */}
-        {testResponse && (
-          <View className="w-full max-w-sm rounded-2xl bg-background-card p-5 border border-slate-700 shadow-xl">
-            <Text className="text-xs font-bold text-accent-purple mb-2 uppercase tracking-wider">
-              Відповідь AI (Tech Lead):
-            </Text>
-            <Text className="text-slate-200 text-sm leading-relaxed">
-              {testResponse}
-            </Text>
-          </View>
-        )}
       </ScrollView>
     </SafeAreaView>
   );

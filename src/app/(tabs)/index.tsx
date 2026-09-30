@@ -197,7 +197,7 @@ export default function HomeScreen() {
           className="rounded-2xl bg-primary py-4 items-center shadow-lg active:bg-primary-dark"
         >
           <Text className="font-bold text-white text-base">
-            &#x1f680; Розпочати співбесіду
+            🚀 Розпочати співбесіду
           </Text>
         </TouchableOpacity>
       </ScrollView>

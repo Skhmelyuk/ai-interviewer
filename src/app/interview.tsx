@@ -222,7 +222,7 @@ export default function InterviewScreen() {
               className="rounded-2xl bg-accent-purple py-3.5 items-center shadow-lg active:opacity-90"
             >
               <Text className="text-white font-bold text-sm">
-                &#x1f504; Пройти ще одну співбесіду
+                🔄 Пройти ще одну співбесіду
               </Text>
             </TouchableOpacity>
           </View>

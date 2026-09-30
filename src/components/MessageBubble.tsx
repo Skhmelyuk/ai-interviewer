@@ -24,7 +24,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             isUser ? "text-blue-200" : "text-accent-purple"
           }`}
         >
-          {isUser ? "Ви (Кандидат)" : "&#x1f916; Tech Lead"}
+          {isUser ? "Ви (Кандидат)" : "🤖 Tech Lead"}
         </Text>
 
         <Text

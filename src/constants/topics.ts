@@ -9,7 +9,7 @@ export const INTERVIEW_TOPICS: InterviewTopic[] = [
   {
     id: "rn-core",
     title: "React Native Core",
-    icon: "&#x1f4f1;",
+    icon: "📱",
     description:
       "Життєвий цикл, хуки (useState, useEffect, useCallback), JSX, FlatList, стилізація.",
   },
@@ -23,14 +23,14 @@ export const INTERVIEW_TOPICS: InterviewTopic[] = [
   {
     id: "nav-state",
     title: "Навігація та Стан",
-    icon: "&#x1f9ed;",
+    icon: "🧭",
     description:
       "Expo Router, файлова структура маршрутів, React Context, Zustand/Redux Toolkit.",
   },
   {
     id: "soft-skills",
     title: "Soft Skills & Поведінкові питання",
-    icon: "&#x1f91d;",
+    icon: "🤝",
     description:
       "Робота в команді, вирішення конфліктів, оцінка дедлайнів, взаємодія на Code Review.",
   },

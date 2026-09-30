@@ -229,10 +229,10 @@ export default function SettingsScreen() {
               >
                 {[
                   { id: "all", label: `Всі (${AVAILABLE_MODELS.length})` },
-                  { id: "free", label: "&#x1f193; Free (4)" },
-                  { id: "budget", label: "&#x1f4a1; Budget (4)" },
+                  { id: "free", label: "🆓 Free (4)" },
+                  { id: "budget", label: "💡 Budget (4)" },
                   { id: "mid", label: "⚡ Mid-Tier (5)" },
-                  { id: "flagship", label: "&#x1f451; Flagship (4)" },
+                  { id: "flagship", label: "👑 Flagship (4)" },
                 ].map((chip) => {
                   const isSelected = activeTier === chip.id;
                   return (

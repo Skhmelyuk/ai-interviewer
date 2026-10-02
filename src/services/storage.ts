@@ -1,7 +1,15 @@
+import { InterviewPreferences } from "@/types";
 import * as SecureStore from "expo-secure-store";
 
 const API_KEY_STORAGE = "user_openrouter_key";
 const MODEL_STORAGE = "user_selected_model";
+const PREFERENCES_STORAGE_KEY = "user_interview_preferences";
+
+const DEFAULT_PREFERENCES: InterviewPreferences = {
+  isVoiceEnabled: true,
+  timerSeconds: 90,
+  isHapticsEnabled: true,
+};
 
 export async function saveApiKey(key: string): Promise<void> {
   await SecureStore.setItemAsync(API_KEY_STORAGE, key.trim());
@@ -64,4 +72,29 @@ export async function getSelectedModel(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Отримує налаштування звуку та таймера.
+ */
+export async function getInterviewPreferences(): Promise<InterviewPreferences> {
+  try {
+    const raw = await SecureStore.getItemAsync(PREFERENCES_STORAGE_KEY);
+    if (!raw) return DEFAULT_PREFERENCES;
+    return JSON.parse(raw) as InterviewPreferences;
+  } catch {
+    return DEFAULT_PREFERENCES;
+  }
+}
+
+/**
+ * Зберігає налаштування звуку та таймера.
+ */
+export async function saveInterviewPreferences(
+  prefs: InterviewPreferences,
+): Promise<void> {
+  await SecureStore.setItemAsync(
+    PREFERENCES_STORAGE_KEY,
+    JSON.stringify(prefs),
+  );
 }

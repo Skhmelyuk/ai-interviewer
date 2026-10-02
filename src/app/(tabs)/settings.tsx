@@ -1,25 +1,31 @@
-import React, { useState, useEffect } from "react";
+import { AVAILABLE_MODELS, DEFAULT_MODEL } from "@/constants/models";
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
+  deleteApiKey,
+  getCustomApiKey,
+  getEnvApiKey,
+  getInterviewPreferences,
+  getSelectedModel,
+  saveApiKey,
+  saveInterviewPreferences,
+  saveSelectedModel,
+} from "@/services/storage";
+import {
+  AIModelTier,
+  InterviewPreferences,
+  TimerDurationOption,
+} from "@/types";
+import { useEffect, useState } from "react";
+import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  getApiKey,
-  getCustomApiKey,
-  getEnvApiKey,
-  saveApiKey,
-  deleteApiKey,
-  getSelectedModel,
-  saveSelectedModel,
-} from "@/services/storage";
-import { AVAILABLE_MODELS, DEFAULT_MODEL } from "@/constants/models";
-import { AIModelTier } from "@/types";
 
 export default function SettingsScreen() {
   const [apiKeyInput, setApiKeyInput] = useState("");
@@ -28,10 +34,21 @@ export default function SettingsScreen() {
   const [hasEnvKey, setHasEnvKey] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTier, setActiveTier] = useState<"all" | AIModelTier>("all");
+  const [preferences, setPreferences] = useState<InterviewPreferences>({
+    isVoiceEnabled: true,
+    timerSeconds: 90,
+    isHapticsEnabled: true,
+  });
 
   useEffect(() => {
     loadSettings();
   }, []);
+
+  // Функція оновлення налаштувань:
+  const updatePref = async (newPrefs: InterviewPreferences) => {
+    setPreferences(newPrefs);
+    await saveInterviewPreferences(newPrefs);
+  };
 
   const loadSettings = async () => {
     setLoading(true);
@@ -39,6 +56,8 @@ export default function SettingsScreen() {
       const customKey = await getCustomApiKey();
       const envKey = getEnvApiKey();
       const existingModel = await getSelectedModel();
+      const prefs = await getInterviewPreferences();
+      setPreferences(prefs);
 
       setHasEnvKey(!!envKey);
 
@@ -327,6 +346,93 @@ export default function SettingsScreen() {
               )}
             </View>
           )}
+        </View>
+        {/* Секція: Режим реалістичного інтерв'ю */}
+        <View className="mb-6 rounded-2xl bg-slate-900/80 p-4 border border-slate-800">
+          <Text className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-3">
+            &#x1f399;️ Режим симуляції співбесіди
+          </Text>
+
+          {/* Перемикач озвучення */}
+          <View className="flex-row items-center justify-between py-2 border-b border-slate-800">
+            <View className="flex-1 mr-3">
+              <Text className="text-xs font-bold text-white">
+                Озвучення Tech Lead
+              </Text>
+              <Text className="text-[10px] text-slate-400 mt-0.5">
+                Зачитувати запитання на слух (Text-to-Speech)
+              </Text>
+            </View>
+            <Switch
+              value={preferences.isVoiceEnabled}
+              onValueChange={(val) =>
+                updatePref({ ...preferences, isVoiceEnabled: val })
+              }
+              trackColor={{ false: "#334155", true: "#3B82F6" }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          {/* Перемикач вібрації */}
+          <View className="flex-row items-center justify-between py-2 border-b border-slate-800">
+            <View className="flex-1 mr-3">
+              <Text className="text-xs font-bold text-white">
+                Тактильний відгук
+              </Text>
+              <Text className="text-[10px] text-slate-400 mt-0.5">
+                Вібрація при отриманні відповіді та таймері
+              </Text>
+            </View>
+            <Switch
+              value={preferences.isHapticsEnabled}
+              onValueChange={(val) =>
+                updatePref({ ...preferences, isHapticsEnabled: val })
+              }
+              trackColor={{ false: "#334155", true: "#3B82F6" }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          {/* Вибір ліміту таймера */}
+          <View className="pt-3">
+            <Text className="text-xs font-bold text-white mb-1.5">
+              Обмеження часу на відповідь
+            </Text>
+            <View className="flex-row gap-2">
+              {[
+                { id: 0, label: "Без ліміту" },
+                { id: 60, label: "60 сек" },
+                { id: 90, label: "90 сек" },
+                { id: 120, label: "120 сек" },
+              ].map((option) => {
+                const isSelected = preferences.timerSeconds === option.id;
+                return (
+                  <TouchableOpacity
+                    key={option.id}
+                    onPress={() =>
+                      updatePref({
+                        ...preferences,
+                        timerSeconds: option.id as TimerDurationOption,
+                      })
+                    }
+                    className={`flex-1 py-2 rounded-xl border items-center ${
+                      isSelected
+                        ? "bg-primary border-primary"
+                        : "bg-slate-900 border-slate-700"
+                    }`}
+                  >
+                    <Text
+                      className={`text-[10px] font-bold ${
+                        isSelected ? "text-white" : "text-slate-400"
+                      }`}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>

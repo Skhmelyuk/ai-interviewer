@@ -67,3 +67,15 @@ export interface CandidateAnalytics {
   overallAverageScore: number;
   topicStats: TopicStatItem[];
 }
+
+// ==========================================
+// НАЛАШТУВАННЯ ІНТЕРВ'Ю: Звук та Таймер
+// ==========================================
+
+export type TimerDurationOption = 0 | 60 | 90 | 120; // 0 = таймер вимкнено
+
+export interface InterviewPreferences {
+  isVoiceEnabled: boolean; // Озвучення питань Tech Lead
+  timerSeconds: TimerDurationOption; // Ліміт часу на кожне питання
+  isHapticsEnabled: boolean; // Тактильний відгук
+}

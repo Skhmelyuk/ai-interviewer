@@ -12,7 +12,14 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Keyboard,
 } from "react-native";
+import {
+  useAudioRecorder,
+  useAudioRecorderState,
+  RecordingPresets,
+} from "expo-audio";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { MessageBubble } from "@/components/MessageBubble";
@@ -28,7 +35,14 @@ import {
   InterviewPreferences,
   InterviewSession,
   OpenRouterAPIMessage,
+  VoiceRecordingStatus,
 } from "@/types";
+import {
+  requestMicrophonePermission,
+  setupAudioModeForRecording,
+  resetAudioMode,
+  transcribeAudioWithWhisper,
+} from "@/services/transcription";
 
 export default function InterviewScreen() {
   const router = useRouter();
@@ -47,6 +61,19 @@ export default function InterviewScreen() {
   const [isFinished, setIsFinished] = useState(false);
   const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
 
+  // ==========================================
+  // Стан запису голосу (expo-audio)
+  // ==========================================
+  // Рекордер з високоякісним бітрейтом (m4a / aac)
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+
+  // Опитуємо стан рекордера кожні 500 мс (отримуємо точний durationMillis для таймера)
+  const recorderState = useAudioRecorderState(audioRecorder, 500);
+
+  // Стан інтерфейсу: "idle" (очікування), "recording" (запис), "transcribing" (розпізнавання)
+  const [recordingStatus, setRecordingStatus] =
+    useState<VoiceRecordingStatus>("idle");
+
   // Налаштування та таймер
   const [prefs, setPrefs] = useState<InterviewPreferences>({
     isVoiceEnabled: true,
@@ -58,6 +85,24 @@ export default function InterviewScreen() {
 
   const flatListRef = useRef<FlatList>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    loadInitialConfig();
+    return () => {
+      stopSpeech();
+      clearTimer();
+      cleanupVoiceRecording(); // Очищення аудіоресурсів
+    };
+  }, []);
+
+  const cleanupVoiceRecording = async () => {
+    try {
+      if (audioRecorder.isRecording) {
+        await audioRecorder.stop();
+      }
+      await resetAudioMode();
+    } catch {}
+  };
 
   useEffect(() => {
     loadInitialConfig();
@@ -99,6 +144,104 @@ export default function InterviewScreen() {
         return prev - 1;
       });
     }, 1000);
+  };
+
+  // ==========================================
+  // Логіка запису голосу (expo-audio)
+  // ==========================================
+  const handleStartVoiceRecording = async () => {
+    try {
+      Keyboard.dismiss();
+      stopSpeech();
+
+      const hasPermission = await requestMicrophonePermission();
+      if (!hasPermission) {
+        Alert.alert(
+          "Помилка",
+          "Немає доступу до мікрофона. Надайте дозвіл у налаштуваннях пристрою.",
+        );
+        return;
+      }
+
+      if (prefs.isHapticsEnabled) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+
+      await setupAudioModeForRecording();
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
+      setRecordingStatus("recording");
+    } catch (error: any) {
+      Alert.alert(
+        "Помилка запису",
+        error.message || "Не вдалося активувати мікрофон.",
+      );
+      setRecordingStatus("idle");
+    }
+  };
+
+  const handleCancelVoiceRecording = async () => {
+    try {
+      if (audioRecorder.isRecording) {
+        await audioRecorder.stop();
+      }
+      await resetAudioMode();
+    } catch {}
+
+    setRecordingStatus("idle");
+
+    if (prefs.isHapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const handleStopAndTranscribe = async () => {
+    if (prefs.isHapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+
+    setRecordingStatus("transcribing");
+
+    try {
+      await audioRecorder.stop();
+      await resetAudioMode();
+
+      const fileUri = audioRecorder.uri;
+      if (!fileUri) {
+        throw new Error("Не вдалося отримати файл аудіозапису.");
+      }
+
+      const result = await transcribeAudioWithWhisper(fileUri);
+
+      if (result.text) {
+        // Підставляємо розпізнаний текст у поле введення (додаємо до вже набраного, якщо є)
+        setInputAnswer((prev) =>
+          prev ? `${prev.trim()} ${result.text}` : result.text,
+        );
+
+        if (prefs.isHapticsEnabled) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      } else {
+        Alert.alert(
+          "Звук не розпізнано",
+          "Не вдалося почути мову. Спробуйте говорити голосніше.",
+        );
+      }
+    } catch (error: any) {
+      Alert.alert(
+        "Помилка транскрипції",
+        error.message || "Не вдалося розпізнати аудіо.",
+      );
+    } finally {
+      setRecordingStatus("idle");
+    }
+  };
+
+  const formatSecondsToMMSS = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   const handleTimeout = () => {
@@ -258,7 +401,7 @@ export default function InterviewScreen() {
   };
 
   const handleRequestHint = () => {
-    if (loading) return;
+    if (loading || recordingStatus !== "idle") return;
     handleSendAnswer(
       "[ПІДКАЗКА] Підкажи, будь ласка, з чого почати або дай короткий натяк?",
     );
@@ -321,6 +464,7 @@ export default function InterviewScreen() {
             onPress={() => {
               stopSpeech();
               clearTimer();
+              cleanupVoiceRecording();
               Alert.alert(
                 "Завершити інтерв'ю?",
                 "Ваш поточний прогрес не буде збережено.",
@@ -402,8 +546,12 @@ export default function InterviewScreen() {
             <View className="flex-row justify-between items-center mb-2 px-1">
               <TouchableOpacity
                 onPress={handleRequestHint}
-                disabled={loading}
-                className="flex-row items-center gap-1.5 bg-slate-800/80 border border-slate-700 rounded-full px-3 py-1 active:bg-slate-700"
+                disabled={loading || recordingStatus !== "idle"}
+                className={`flex-row items-center gap-1.5 rounded-full px-3 py-1 border border-slate-700 ${
+                  recordingStatus !== "idle"
+                    ? "bg-slate-900 opacity-50"
+                    : "bg-slate-800/80 active:bg-slate-700"
+                }`}
               >
                 <Text className="text-xs">&#x1f4a1;</Text>
                 <Text className="text-[11px] font-semibold text-slate-300">
@@ -421,28 +569,88 @@ export default function InterviewScreen() {
               )}
             </View>
 
-            <View className="flex-row items-center gap-2">
-              <TextInput
-                value={inputAnswer}
-                onChangeText={setInputAnswer}
-                placeholder="Введіть вашу технічну відповідь..."
-                placeholderTextColor="#64748B"
-                multiline
-                className="flex-1 max-h-24 rounded-2xl bg-slate-900 border border-slate-700 px-4 py-3 text-white text-sm"
-              />
+            {/* ВАРІАНТ 1: Режим активного запису голосу */}
+            {recordingStatus === "recording" ? (
+              <View className="flex-row items-center justify-between bg-slate-900 border border-rose-500/40 rounded-2xl px-4 py-2.5">
+                <View className="flex-row items-center gap-2.5">
+                  <View className="w-3 h-3 rounded-full bg-rose-500 animate-pulse" />
+                  <Text className="text-rose-400 font-bold text-sm">
+                    {formatSecondsToMMSS(
+                      Math.round((recorderState?.durationMillis || 0) / 1000),
+                    )}
+                  </Text>
+                  <Text className="text-xs text-slate-400">Говоріть...</Text>
+                </View>
 
-              <TouchableOpacity
-                onPress={() => handleSendAnswer()}
-                disabled={loading || !inputAnswer.trim()}
-                className={`rounded-2xl px-5 py-3.5 items-center justify-center ${
-                  inputAnswer.trim() && !loading
-                    ? "bg-primary active:bg-primary-dark"
-                    : "bg-slate-800 opacity-50"
-                }`}
-              >
-                <Text className="text-white font-bold text-sm">Надіслати</Text>
-              </TouchableOpacity>
-            </View>
+                <View className="flex-row items-center gap-2">
+                  <TouchableOpacity
+                    onPress={handleCancelVoiceRecording}
+                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 active:bg-slate-700"
+                  >
+                    <Text className="text-xs text-slate-300 font-semibold">
+                      ❌ Скасувати
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleStopAndTranscribe}
+                    className="px-3.5 py-2 rounded-xl bg-accent-success active:opacity-90 flex-row items-center gap-1"
+                  >
+                    <Text className="text-xs text-white font-bold">
+                      ✅ Готово
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : recordingStatus === "transcribing" ? (
+              /* ВАРІАНТ 2: Стан розпізнавання Whisper */
+              <View className="flex-row items-center justify-center gap-2 bg-slate-900 border border-primary/40 rounded-2xl p-3.5">
+                <ActivityIndicator size="small" color="#60A5FA" />
+                <Text className="text-xs text-primary font-semibold">
+                  &#x1f3af; Розпізнаємо відповідь через Whisper AI...
+                </Text>
+              </View>
+            ) : (
+              /* ВАРІАНТ 3: Звичайне текстове введення + кнопка мікрофона */
+              <View className="flex-row items-center gap-2">
+                <TextInput
+                  value={inputAnswer}
+                  onChangeText={setInputAnswer}
+                  placeholder="Введіть або надиктуйте відповідь..."
+                  placeholderTextColor="#64748B"
+                  multiline
+                  className="flex-1 max-h-24 rounded-2xl bg-slate-900 border border-slate-700 px-4 py-3 text-white text-sm"
+                />
+
+                {/* Кнопка мікрофона */}
+                <TouchableOpacity
+                  onPress={handleStartVoiceRecording}
+                  disabled={loading}
+                  className={`w-12 h-12 rounded-2xl items-center justify-center border ${
+                    loading
+                      ? "bg-slate-800 border-slate-700 opacity-50"
+                      : "bg-slate-800 border-primary/40 active:bg-primary/20"
+                  }`}
+                >
+                  <Text className="text-lg">&#x1f399;️</Text>
+                </TouchableOpacity>
+
+                {/* Кнопка відправки */}
+                <TouchableOpacity
+                  onPress={() => handleSendAnswer()}
+                  disabled={loading || !inputAnswer.trim()}
+                  className={`rounded-2xl px-4 py-3.5 items-center justify-center ${
+                    inputAnswer.trim() && !loading
+                      ? "bg-primary active:bg-primary-dark"
+                      : "bg-slate-800 opacity-50"
+                  }`}
+                >
+                  <Text className="text-white font-bold text-sm">
+                    Надіслати
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         ) : (
           <View className="p-4 border-t border-slate-800 bg-background-card gap-2.5">

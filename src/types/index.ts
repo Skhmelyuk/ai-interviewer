@@ -79,3 +79,14 @@ export interface InterviewPreferences {
   timerSeconds: TimerDurationOption; // Ліміт часу на кожне питання
   isHapticsEnabled: boolean; // Тактильний відгук
 }
+
+// ==========================================
+// ГОЛОСОВЕ ВВЕДЕННЯ (Speech-to-Text)
+// ==========================================
+
+export type VoiceRecordingStatus = "idle" | "recording" | "transcribing";
+
+export interface AudioTranscriptionResult {
+  text: string;
+  durationSeconds?: number;
+}

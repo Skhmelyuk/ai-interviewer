@@ -319,7 +319,21 @@ export default function SettingsScreen() {
                   );
                 })}
               </View>
-
+              {/* Картка інфо про голосове введення */}
+              <View className="mt-3 p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex-row items-center gap-3">
+                <View className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 items-center justify-center">
+                  <Text className="text-base">&#x1f399;️</Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-xs font-semibold text-white">
+                    Голосове введення (Whisper STT)
+                  </Text>
+                  <Text className="text-[10px] text-slate-400 mt-0.5">
+                    Натисніть мікрофон на екрані співбесіди для диктування
+                    технічних відповідей голосом.
+                  </Text>
+                </View>
+              </View>
               {/* Кнопки збереження/видалення */}
               <TouchableOpacity
                 onPress={handleSave}

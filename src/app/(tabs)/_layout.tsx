@@ -31,7 +31,17 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* Вкладка 2: Налаштування */}
+      {/* Вкладка 2: Історія та Аналітика */}
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: "Історія",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="stats-chart" size={size} color={color} />
+          ),
+        }}
+      />
+      {/* Вкладка 3: Налаштування */}
       <Tabs.Screen
         name="settings"
         options={{

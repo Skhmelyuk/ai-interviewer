@@ -1,8 +1,10 @@
 import { MessageBubble } from "@/components/MessageBubble";
 import { INTERVIEW_LEVELS, INTERVIEW_TOPICS } from "@/constants/topics";
+import { saveInterviewSession } from "@/services/historyStorage";
 import { sendChatToOpenRouter } from "@/services/openrouter";
 import { buildInterviewSystemPrompt } from "@/services/prompts";
-import { ChatMessage, OpenRouterAPIMessage } from "@/types";
+import { parseAIReport } from "@/services/reportParser";
+import { ChatMessage, InterviewSession, OpenRouterAPIMessage } from "@/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -17,6 +19,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
 
 export default function InterviewScreen() {
   const router = useRouter();
@@ -33,6 +36,7 @@ export default function InterviewScreen() {
   const [inputAnswer, setInputAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
+  const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
 
   const flatListRef = useRef<FlatList>(null);
 
@@ -122,6 +126,27 @@ export default function InterviewScreen() {
         aiReply.includes("ОЦІНКА:")
       ) {
         setIsFinished(true);
+
+        // Автоматичне збереження результату співбесіди
+        const parsedReport = parseAIReport(aiReply);
+        const sessionId = Date.now().toString();
+
+        const sessionData: InterviewSession = {
+          id: sessionId,
+          topicId: currentTopic.id,
+          topicTitle: currentTopic.title,
+          levelId: currentLevel.id,
+          levelTitle: currentLevel.title,
+          timestamp: Date.now(),
+          messages: [...newMessages, aiMsg],
+          report: parsedReport,
+        };
+
+        saveInterviewSession(sessionData).catch((err) =>
+          console.error("Помилка збереження історії:", err)
+        );
+
+        setSavedSessionId(sessionId);
       }
     } catch (err: any) {
       Alert.alert("Помилка AI", err.message);
@@ -166,9 +191,9 @@ export default function InterviewScreen() {
 
       {/* Чат */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-        className="flex-1"
+        style={{flex:1}}
       >
         <FlatList
           ref={flatListRef}
@@ -227,6 +252,36 @@ export default function InterviewScreen() {
             </TouchableOpacity>
           </View>
         )}
+        {/* Нижня панель при завершенні */}
+        {isFinished && (
+          <View className="p-4 border-t border-slate-800 bg-background-card gap-2.5">
+            {savedSessionId && (
+              <TouchableOpacity
+                onPress={() =>
+                  router.replace({
+                    pathname: "/report/[id]",
+                    params: { id: savedSessionId },
+                  })
+                }
+                className="rounded-2xl bg-accent-success py-3.5 items-center shadow-lg active:opacity-90"
+              >
+                <Text className="text-white font-bold text-sm">
+                  &#x1f4ca; Переглянути детальний звіт
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              onPress={() => router.replace("/(tabs)")}
+              className="rounded-2xl bg-slate-800 py-3.5 items-center border border-slate-700 active:bg-slate-700"
+            >
+              <Text className="text-slate-300 font-semibold text-sm">
+                &#x1f504; На головну
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

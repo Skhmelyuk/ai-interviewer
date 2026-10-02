@@ -33,3 +33,37 @@ export interface AIModelOption {
   pricing?: string;
   tier?: AIModelTier;
 }
+
+export interface ParsedInterviewReport {
+  score: number; // Оцінка кандидата від 1 до 10
+  maxScore: number; // Зазвичай 10
+  strengths: string[]; // Сильні сторони
+  weaknesses: string[]; // Зони розвитку та помилки
+  recommendedTopics: string[]; // Що повторити
+  rawReport: string; // Оригінальний текст звіту від AI
+}
+
+export interface InterviewSession {
+  id: string; // Унікальний ідентифікатор сесії
+  topicId: string;
+  topicTitle: string;
+  levelId: string;
+  levelTitle: string;
+  timestamp: number; // Дата та час проведення
+  messages: ChatMessage[]; // Повний діалог запитань та відповідей
+  report: ParsedInterviewReport; // Структурований результат
+}
+
+export interface TopicStatItem {
+  topicId: string;
+  topicTitle: string;
+  icon: string;
+  sessionsCount: number;
+  averageScore: number;
+}
+
+export interface CandidateAnalytics {
+  totalInterviews: number;
+  overallAverageScore: number;
+  topicStats: TopicStatItem[];
+}

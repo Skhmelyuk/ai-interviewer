@@ -136,7 +136,7 @@ export default function HomeScreen() {
                 key={topic.id}
                 onPress={() => setSelectedTopic(topic)}
                 activeOpacity={0.8}
-                className={`rounded-2xl p-4 border transition-all ${
+                className={`rounded-2xl p-4 border ${
                   isSelected
                     ? "bg-primary/20 border-primary"
                     : "bg-background-card border-slate-800"
